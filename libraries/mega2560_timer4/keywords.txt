@@ -1,0 +1,27 @@
+#######################################
+# Syntax Coloring Map For Timer Library
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+mega2560_timer4	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+t4_initial	    KEYWORD2
+stop		    KEYWORD2
+start           KEYWORD2
+set_TCNT4       KEYWORD2
+get_counter     KEYWORD2
+counter_add     KEYWORD2
+counter_clear   KEYWORD2
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################

@@ -8,6 +8,7 @@
 #include <CLP_MOTOR.h>
 #include <mega2560_timer4.h>
 mega2560_timer4 tmr4;
+
 //--------------------------------------------
 //limit sensor
 #define pin_limit_sensor1  18     //normal = 0 
@@ -20,11 +21,13 @@ bool limit_sensor2_on = 0;
 //button
 #define pin_BTN_ER_stop  2
 #define pin_BTN_CLPSM_freeze  3
+bool BTN_ER_stop_state = 1; 
+bool BTN_CLPSM_freeze_state = 1; 
 //--------------------------------------------
 
 //--------------------------------------------
 //timer4 
-#define timer4_set t4_s4
+#define timer4_set t4_s2
 bool Timer4_SW = 0;
 //--------------------------------------------
 
@@ -33,6 +36,23 @@ bool Timer4_SW = 0;
 CLPMTR *CLPSM_controller= new CLPMTR;
 #define pin_CLPSM_pulse 7   //control TIP41C, B
 #define pin_CLPSM_DIR 6     //control TIP41C, B
+enum {sm_stop=0 ,sm_start =1};
+//--------------------------------------------
+
+//--------------------------------------------
+//servo 
+#define pin_servo_angle A0
+#define servo_zero  180
+#define servo_Min  110
+#define servo_Max  250
+#define servo_standby_r 210
+#define servo_standby_l 150
+#define init_to_zero  1 //0 no ,1 yes
+//pair:4(l)-3(r) 2(l)-1(r) ,
+#define pin_servo1 9
+#define pin_servo2 10
+#define pin_servo3 11
+#define pin_servo4 12
 //--------------------------------------------
 
 void timer4_ISR(void) {
@@ -53,25 +73,48 @@ void timer4_ISR(void) {
 
 void setup() {
   Serial.begin(9600);
+  read_servo_angle_initial();
+  servo_initial();  
+  delay(100);  
   timer4_initial();
   interrupt_limit_sensor_initial();
-  interrupt_BTN_initial();
+  interrupt_BTN_initial(); 
+  delay(5000);  
   CLPSM_initial();
   Serial.println("start");
 }
 
 void loop() {
+    uint8_t read_angle = read_servo_angle();      
+  if(BTN_ER_stop_state) {
+        servo_move(servo_zero+read_angle , servo_zero-read_angle);     //l,r
+        CLPSM_start_stop(sm_stop); 
+        delay(1200);  
+        servo_standby(servo_standby_l, servo_standby_r);
+        delay(1200);  
+        if(BTN_CLPSM_freeze_state) {
+            CLPSM_start_stop(sm_start); 
+            delay(5
+            00);  
+        }
+  }
 }
 
 void timer4_initial() {
   tmr4.t4_initial(timer4_set, timer4_ISR);
-  if(digitalRead(pin_BTN_ER_stop) == 1 && digitalRead(pin_BTN_CLPSM_freeze) == 1){
-    tmr4.start();
-  } else {
-    tmr4.stop();     
-  }
 }
 
+void CLPSM_start_stop(bool CLPSM_move) {
+    if(CLPSM_move) {  
+        if(digitalRead(pin_BTN_ER_stop) == 1 && digitalRead(pin_BTN_CLPSM_freeze) == 1){
+          tmr4.start();
+        } else {
+          tmr4.stop();   
+        }  
+     } else {
+          tmr4.stop();   
+     }
+}
 void interrupt_limit_sensor_initial() {
   digitalWrite(pin_limit_sensor1, HIGH); //turn on pullup resistor
   digitalWrite(pin_limit_sensor2, HIGH);  //turn on pullup resistor
@@ -84,7 +127,8 @@ void limit_sensor1_ISR() {
     static unsigned long last_interrupt_time = 0;
     unsigned long interrupt_time = millis();
     if (interrupt_time - last_interrupt_time > 50) {
-      CLPSM_controller->setCLPMTR_CW();
+      CLPSM_controller->setCLPMTR_CCW();
+      Serial.println("s1");
     }
     last_interrupt_time = interrupt_time;
   }
@@ -96,7 +140,8 @@ void limit_sensor2_ISR() {
     static unsigned long last_interrupt_time = 0;
     unsigned long interrupt_time = millis();
     if (interrupt_time - last_interrupt_time > 50) {
-      CLPSM_controller->setCLPMTR_CCW();
+      CLPSM_controller->setCLPMTR_CW();
+            Serial.println("s2");
     }
     last_interrupt_time = interrupt_time;
   }
@@ -114,17 +159,22 @@ void interrupt_BTN_initial() {
 
 void BTN_ER_stop_ISR() {
    if(digitalRead(pin_BTN_ER_stop) == 0){
-        timer_stop_counter_zero();
+        servo_standby(servo_standby_l, servo_standby_r);
+        timer_stop_counter_zero();        
+        BTN_ER_stop_state = 0;
      } else {
         tmr4.start();
+        BTN_ER_stop_state = 1;
     }
 }
 
 void BTN_CLPSM_freeze_ISR() {
    if(digitalRead(pin_BTN_CLPSM_freeze) == 0){ 
            timer_stop_counter_zero();
+           BTN_CLPSM_freeze_state = 0;
     } else {      
-            tmr4.start();
+           BTN_CLPSM_freeze_state  =1;
+           tmr4.start();
     }  
 }
 
@@ -138,5 +188,97 @@ void timer_stop_counter_zero() {
     tmr4.stop();
     tmr4.counter_clear();
 }
+
+void read_servo_angle_initial() {
+  pinMode(pin_servo_angle, INPUT);  
+}
+
+uint8_t read_servo_angle() {
+  float read_ag = analogRead(pin_servo_angle);
+  int div10 = 10;
+  //Serial.println("read_ag(0-1023): ");
+  //Serial.println(read_ag);
+ div10 = read_ag/1024*div10;
+  //Serial.println("div10(0-9): ");
+  //Serial.println(div10);
+  if(div10 == 0) {
+    return 0;
+  } else{
+    div10 = (div10+1)*3;  //(1-9)change to (0-30)
+    return div10;
+  } 
+}
+
+void servo_initial() {
+  pinMode(pin_servo1, OUTPUT);
+  pinMode(pin_servo2, OUTPUT);
+  pinMode(pin_servo3, OUTPUT);
+  pinMode(pin_servo4, OUTPUT);
+#if init_to_zero
+  analogWrite(pin_servo1, servo_zero); //ZERO
+  analogWrite(pin_servo2, servo_zero);
+  analogWrite(pin_servo3, servo_zero);
+  analogWrite(pin_servo4, servo_zero);
+#endif
+  servo_standby(servo_standby_l, servo_standby_r);
+}
+
+void servo_standby(uint8_t l, uint8_t r) {
+      analogWrite(pin_servo1, r);
+      analogWrite(pin_servo2, l);
+      analogWrite(pin_servo3, r);
+      analogWrite(pin_servo4, l);   
+}
+
+
+void servo_move(uint8_t goal_l, uint8_t goal_r){
+    if(goal_r > servo_Max) {
+     goal_r = servo_Max;
+    }         
+    if(goal_r < servo_Min) {
+      goal_r = servo_Min;
+    }   
+    
+     if(goal_l > servo_Max) {
+     goal_l = servo_Max;
+    }         
+    if(goal_l < servo_Min) {
+      goal_l = servo_Min;
+    }   
+    
+    int i = 0, range = 0;
+    int range_r = abs(goal_r - servo_standby_r) ;
+    int range_l = abs(goal_l - servo_standby_l) ;
+    if(range_r > range_l) {
+      range = range_r;
+          for(i =0; i < range; i++) {      
+            range_r = i;
+            analogWrite(pin_servo1,  servo_standby_r-range_r);           
+            analogWrite(pin_servo3,  servo_standby_r-range_r);   
+            if(range_r >=  range_l) {
+              range_l =  range_l;
+            } else {
+              range_l = i;
+            }
+            analogWrite(pin_servo2,  servo_standby_l+range_l);   
+            analogWrite(pin_servo4,  servo_standby_l+range_l);   
+          }     
+    } else {
+         range = range_l;
+         for(i =0; i < range; i++) {      
+                range_l = i;    
+                analogWrite(pin_servo2,  servo_standby_l+range_l);   
+                analogWrite(pin_servo4,  servo_standby_l+range_l);   
+                if(range_l >=  range_r) {
+                  range_l =  range_r;
+                } else {
+                  range_l = i;
+                }
+                analogWrite(pin_servo1,  servo_standby_r-range_r);           
+                analogWrite(pin_servo3,  servo_standby_r-range_r);   
+          }     
+    }     
+}
+
 
 

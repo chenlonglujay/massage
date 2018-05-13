@@ -1,6 +1,6 @@
 //------------------------
 //Arduino Mega2560 timer4(16bit)
-//pwm use timer 4 for pin 8 and0 7 and 6,so use timer4 can't use pwm
+//pwm use timer 4 for pin 8 and 7 and 6,so use timer4 can't use pwm
 /*timer set example
     16MHz/64 = 0.25MHz
     1/0.25M = 4us

@@ -8,13 +8,22 @@
 #include <CLP_MOTOR.h>
 #include <mega2560_timer4.h>
 mega2560_timer4 tmr4;
-
+//limit sensor
+//M------------E---------E---------------M
 //--------------------------------------------
 //limit sensor
-#define pin_limit_sensor1  18     //normal = 0 
-#define pin_limit_sensor2  19     //normal = 0
-bool limit_sensor1_on = 0;
-bool limit_sensor2_on = 0;
+//if motor touchs  limit sensor E that will change direction
+#define pin_limitE_sensor1  18     //normal = 0 
+#define pin_limitE_sensor2  19     //normal = 0
+bool limitE_sensor1_on = 0;
+bool limitE_sensor2_on = 0;
+//--------------------------------------------
+
+//--------------------------------------------
+//limit sensor M
+//if limt sensorE broken that will use limit sensorM to detect motor arrives limit side. 
+#define pin_limitM_sensor1  38     //normal = 0 
+#define pin_limitM_sensor2  39     //normal = 0
 //--------------------------------------------
 
 //--------------------------------------------
@@ -79,6 +88,7 @@ void setup() {
   timer4_initial();
   interrupt_limit_sensor_initial();
   interrupt_BTN_initial(); 
+  limitM_sensor_initial();
   delay(5000);  
   CLPSM_initial();
   Serial.println("start");
@@ -86,18 +96,21 @@ void setup() {
 
 void loop() {
     uint8_t read_angle = read_servo_angle();      
-  if(BTN_ER_stop_state) {
-        servo_move(servo_zero+read_angle , servo_zero-read_angle);     //l,r
-        CLPSM_start_stop(sm_stop); 
-        delay(1200);  
-        servo_standby(servo_standby_l, servo_standby_r);
-        delay(1200);  
-        if(BTN_CLPSM_freeze_state) {
-            CLPSM_start_stop(sm_start); 
-            delay(5
-            00);  
-        }
-  }
+    limitM_DIR_chcek();
+    if(BTN_ER_stop_state) {     
+        //no press BTN_ER_stop
+          CLPSM_start_stop(sm_stop);  
+          delay(500);  
+          servo_move(servo_zero+read_angle , servo_zero-read_angle);     //l,r        
+          delay(1200);  
+          servo_standby(servo_standby_l, servo_standby_r);
+          delay(1200);  
+          if(BTN_CLPSM_freeze_state) {
+            //no BTN_CLPSM_freeze              
+              CLPSM_start_stop(sm_start); 
+              delay(500);  
+          }
+    }
 }
 
 void timer4_initial() {
@@ -116,14 +129,21 @@ void CLPSM_start_stop(bool CLPSM_move) {
      }
 }
 void interrupt_limit_sensor_initial() {
-  digitalWrite(pin_limit_sensor1, HIGH); //turn on pullup resistor
-  digitalWrite(pin_limit_sensor2, HIGH);  //turn on pullup resistor
-  attachInterrupt(digitalPinToInterrupt(pin_limit_sensor1), limit_sensor1_ISR, RISING);
-  attachInterrupt(digitalPinToInterrupt(pin_limit_sensor2), limit_sensor2_ISR, RISING);
+  digitalWrite(pin_limitE_sensor1, HIGH); //turn on pullup resistor
+  digitalWrite(pin_limitE_sensor2, HIGH);  //turn on pullup resistor
+  attachInterrupt(digitalPinToInterrupt(pin_limitE_sensor1), limit_sensor1_ISR, RISING);
+  attachInterrupt(digitalPinToInterrupt(pin_limitE_sensor2), limit_sensor2_ISR, RISING);
 }
 
+ void limitM_sensor_initial() {
+    pinMode(pin_limitM_sensor1, INPUT);
+    pinMode(pin_limitM_sensor2, INPUT);
+    digitalWrite(pin_limitM_sensor1, HIGH);  //turn on pullup resistor
+    digitalWrite(pin_limitM_sensor2, HIGH);  //turn on pullup resistor
+ }
+
 void limit_sensor1_ISR() {
-  if (!limit_sensor1_on) {
+  if (!limitE_sensor1_on) {
     static unsigned long last_interrupt_time = 0;
     unsigned long interrupt_time = millis();
     if (interrupt_time - last_interrupt_time > 50) {
@@ -132,11 +152,11 @@ void limit_sensor1_ISR() {
     }
     last_interrupt_time = interrupt_time;
   }
-  limit_sensor1_on = false;
+  limitE_sensor1_on = false;
 }
 
 void limit_sensor2_ISR() {
-  if (!limit_sensor2_on) {
+  if (!limitE_sensor2_on) {
     static unsigned long last_interrupt_time = 0;
     unsigned long interrupt_time = millis();
     if (interrupt_time - last_interrupt_time > 50) {
@@ -145,7 +165,7 @@ void limit_sensor2_ISR() {
     }
     last_interrupt_time = interrupt_time;
   }
-  limit_sensor2_on = false;
+  limitE_sensor2_on = false;
 }
 
 void interrupt_BTN_initial() {
@@ -153,6 +173,9 @@ void interrupt_BTN_initial() {
   digitalWrite(pin_BTN_CLPSM_freeze, HIGH);  //turn on pullup resistor  
   pinMode(pin_BTN_ER_stop, INPUT);
   pinMode(pin_BTN_CLPSM_freeze, INPUT);
+  if(!digitalRead(pin_BTN_ER_stop)) {
+        BTN_ER_stop_state = 0; 
+  }
   attachInterrupt(digitalPinToInterrupt(pin_BTN_ER_stop), BTN_ER_stop_ISR , CHANGE);
   attachInterrupt(digitalPinToInterrupt(pin_BTN_CLPSM_freeze), BTN_CLPSM_freeze_ISR, CHANGE);
 }
@@ -173,8 +196,7 @@ void BTN_CLPSM_freeze_ISR() {
            timer_stop_counter_zero();
            BTN_CLPSM_freeze_state = 0;
     } else {      
-           BTN_CLPSM_freeze_state  =1;
-           tmr4.start();
+           BTN_CLPSM_freeze_state  =1;  
     }  
 }
 
@@ -278,6 +300,16 @@ void servo_move(uint8_t goal_l, uint8_t goal_r){
                 analogWrite(pin_servo3,  servo_standby_r-range_r);   
           }     
     }     
+}
+
+void limitM_DIR_chcek() {
+      if(!digitalRead(pin_limitM_sensor1)){        
+          //Serial.println("38");
+          CLPSM_controller->setCLPMTR_CW();
+      } else if(!digitalRead(pin_limitM_sensor2)){
+          //Serial.println("39");
+          CLPSM_controller->setCLPMTR_CCW();
+      }
 }
 
 

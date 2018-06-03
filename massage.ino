@@ -76,6 +76,8 @@ bool CLPSM_stop = 0;        //use for stop motor
 #define onehour_LED_time2 3600  //1sec *3600 = 1hour
 //--------------------------------------------
 
+uint8_t step_seq = 0;
+
 void timer4_ISR(void) {
   tmr4.set_TCNT4(timer4_set);
    if(!CLPSM_stop) {
@@ -114,17 +116,17 @@ void setup() {
   CLPSM_initial();
   MSG.set_blue_LED_off();
   Serial.println("start");
-}
-
-void loop() {
-    uint8_t read_angle = MSG.read_servo_angle();    
-    if(MSG.get_BTN_ER_stop_state() == 0) {
-        timer_stop_counter_zero();        
+  if(MSG.get_BTN_ER_stop_state() == 0) {
+        timer_stop_counter_zero();            
     }
     
     if(MSG.get_BTN_ER_stop_state() == 0) {
         timer_stop_counter_zero();
     }
+}
+
+void loop() {
+    uint8_t read_angle = MSG.read_servo_angle();       
     
     if(MSG.get_onehour_stopAll()) {
         tmr4.stop();   
@@ -132,23 +134,40 @@ void loop() {
         digitalWrite(pin_yellow_LED, 0); //LED ON  
         return;
     }
-    
+        
     limitM_DIR_chcek();
-    if(MSG.get_BTN_ER_stop_state()) {     
-        //no press BTN_ER_stop
+
+        if(step_seq == 0 && MSG.get_BTN_ER_stop_state()) {  
           CLPSM_start_stop(sm_stop);  
+          step_seq = 1;
           delay(500);  
-          MSG.servo_move(servo_zero+read_angle , servo_zero-read_angle);     //l,r        
-          delay(1200);  
-          MSG.servo_standby(servo_standby_l, servo_standby_r);
-          delay(1200);
-          if(MSG.get_BTN_CLPSM_freeze_state()) {
+        }
+         
+          if(step_seq == 1 &&MSG.get_BTN_ER_stop_state()) {  
+              //no press BTN_ER_stop
+              MSG.servo_move(servo_zero+read_angle , servo_zero-read_angle);     //l,r        
+              step_seq = 2;
+                delay(1200);  
+          }
+          
+         if(step_seq == 2 && MSG.get_BTN_ER_stop_state()) {  
+              //no press BTN_ER_stop
+              MSG.servo_standby(servo_standby_l, servo_standby_r);
+              step_seq = 3;
+              delay(1200);
+         }
+         
+          if(step_seq == 3 && MSG.get_BTN_CLPSM_freeze_state() && MSG.get_BTN_ER_stop_state()) {
             //no press BTN_CLPSM_freeze              
               CLPSM_start_stop(sm_start); 
-               limitM_DIR_chcek();
+              step_seq = 0;              
               delay(500);  
+          } else if (step_seq == 3 && MSG.get_BTN_ER_stop_state()) {
+            //no press BTN_ER_sto
+              step_seq = 1;    
+              delay(500);
           }
-    }
+     limitM_DIR_chcek();
     
 }
 
@@ -211,6 +230,7 @@ void BTN_ER_stop_ISR() {
         MSG.set_BTN_ER_stop_state(0);
      } else {
         CLPSM_stop = 0;
+        step_seq = 0;
         MSG.set_BTN_ER_stop_state(1);
     }
 }

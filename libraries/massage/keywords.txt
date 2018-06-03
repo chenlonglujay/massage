@@ -1,0 +1,38 @@
+#######################################
+# Syntax Coloring Map For Timer Library
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+massage	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+massage_initial KEYWORD2 
+massage_initial_servo KEYWORD2
+one_hour_check KEYWORD2    
+get_limitM1 KEYWORD2
+get_limitM2 KEYWORD2
+servo_standby KEYWORD2
+read_servo_angle KEYWORD2
+set_BTN_ER_stop_state KEYWORD2
+get_BTN_ER_stop_state KEYWOR2
+servo_move KEYWORD2
+get_onehour_stopAll KEYWORD2
+set_BTN_CLPSM_freeze_state KEYWORD2
+get_BTN_CLPSM_freeze_state KEYWORD2
+get_limitE_sensor1_first KEYWORD2
+get_limitE_sensor2_first KEYWORD2
+set_limitE_sensor1_first_off KEYWORD2
+set_limitE_sensor2_first_off KEYWORD2
+set_blue_LED_off KEYWORD2
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################
